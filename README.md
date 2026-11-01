@@ -1,163 +1,165 @@
+**English** | [Русский](README.ru.md)
+
 # Docker Monitor
 
-Следит за Docker-контейнерами на сервере и присылает уведомления в **Telegram** и/или **Discord**,
-когда контейнер остановился (`exited`) или не проходит проверку здоровья (`unhealthy`).
-Опциональное **Telegram Mini App** показывает контейнеры, логи, статистику сервера и позволяет
-управлять контейнерами с телефона.
+Watches Docker containers on your server and sends notifications to **Telegram** and/or **Discord**
+when a container stops (`exited`) or fails its health check (`unhealthy`).
+An optional **Telegram Mini App** shows containers, logs and server statistics, and lets you
+control containers from your phone.
 
-## Возможности
+## Features
 
-**Уведомления**
-- Алерт при переходе контейнера в `exited` или `unhealthy` (раз в 30 секунд проверка, повторов нет).
-- В алерте: красивое оформление, **краткая причина** (код выхода, нехватка памяти, ошибка запуска, результат healthcheck) и последние 10 строк лога.
-- Состояние запоминается в базе: после перезагрузки сервера или монитора **не приходит повторная лавина** старых алертов, только по реально изменившимся контейнерам.
-- Кнопка **Open in app** в алерте открывает нужный контейнер в приложении.
+**Alerts**
+- An alert fires when a container enters `exited` or `unhealthy` (checked every 30 seconds, no repeats).
+- Each alert has a clean layout, a **short reason** (exit code, out of memory, start error, health check output) and the last 10 log lines.
+- The last known state is stored in the database: after a server or monitor restart you do **not** get a flood of old alerts, only for containers that really changed.
+- The **Open in app** button in an alert opens that container in the app.
 
 **Telegram Mini App**
-- Вкладка **Контейнеры**: статус, поиск, фильтры, проблемные сверху; детали (аптайм, перезапуски, код выхода, OOM, порты, healthcheck, CPU/RAM), логи, Start / Stop / Restart.
-- Вкладка **Сервер**: CPU, RAM, подкачка, диск, load average, аптайм, число контейнеров, ОС и ядро (температура, если сервер её отдаёт).
-- Вкладка **История**: сбои со статистикой и фильтрами.
-- Вкладка **Настройки**: заглушить алерты по контейнеру или включить режим обслуживания, журнал действий.
-- Русский и английский (по языку Telegram), светлая и тёмная тема.
+- **Containers** tab: status, search, filters, failing containers on top; details (uptime, restarts, exit code, OOM, ports, health check, CPU/RAM), logs, Start / Stop / Restart.
+- **Server** tab: CPU, RAM, swap, disk, load average, uptime, container count, OS and kernel (temperature if the host exposes it).
+- **History** tab: failures with statistics and filters.
+- **Settings** tab: mute alerts per container or enable maintenance mode, action log.
+- Russian and English (follows your Telegram language), light and dark theme.
 
-## Требования
+## Requirements
 
-- Linux-сервер с Docker и плагином Docker Compose (`docker compose version`).
-- Telegram-бот (токен от @BotFather) и ваш Telegram ID (узнать можно у бота @userinfobot).
-- Для Mini App: **публичный HTTPS-адрес** (Telegram не открывает приложения по http). Два способа ниже.
+- A Linux server with Docker and the Docker Compose plugin (`docker compose version`).
+- A Telegram bot (token from @BotFather) and your Telegram ID (ask @userinfobot).
+- For the Mini App: a **public HTTPS address** (Telegram will not open http apps). Two options below.
 
-## Установка (только уведомления)
+## Installation (alerts only)
 
 ```bash
-git clone https://github.com/<ваш-логин>/docker-monitor.git
+git clone https://github.com/<your-login>/docker-monitor.git
 cd docker-monitor
 cp .env.example .env
-nano .env                       # заполните TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID
+nano .env                       # fill in TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID
 docker compose up -d --build
-docker compose logs -f monitor  # убедиться, что всё работает
+docker compose logs -f monitor  # make sure it works
 ```
 
-Минимум для работы в `.env`:
+Minimum `.env`:
 
 ```env
-TELEGRAM_BOT_TOKEN=123456789:токен_от_BotFather
-TELEGRAM_CHAT_ID=ваш_telegram_id
+TELEGRAM_BOT_TOKEN=123456789:token_from_BotFather
+TELEGRAM_CHAT_ID=your_telegram_id
 ```
 
-Перед первым запуском откройте своего бота в Telegram и нажмите **Start**, иначе он не сможет вам писать.
-Discord опционален: укажите `DISCORD_WEBHOOK_URL`.
+Before the first run, open your bot in Telegram and press **Start**, otherwise it cannot message you.
+Discord is optional: set `DISCORD_WEBHOOK_URL`.
 
-## Установка Mini App
+## Installing the Mini App
 
-### Способ 1. Свой домен и Caddy (порты 80 и 443 свободны)
+### Option 1. Your own domain and Caddy (ports 80 and 443 are free)
 
-1. A-запись домена должна указывать на ваш сервер, порты 80 и 443 открыты из интернета.
-2. В `.env`:
+1. The domain's A record must point to your server; ports 80 and 443 must be reachable from the internet.
+2. In `.env`:
    ```env
    COMPOSE_PROFILES=web
    DOMAIN=monitor.example.com
    ```
-3. `docker compose up -d --build`. Caddy сам получит HTTPS-сертификат.
+3. `docker compose up -d --build`. Caddy obtains the HTTPS certificate automatically.
 
-### Способ 2. Cloudflare Tunnel (порты 80/443 заняты или нет белого IP)
+### Option 2. Cloudflare Tunnel (ports 80/443 are taken, or no public IP)
 
-Подходит, если на сервере уже работает `cloudflared`. Caddy не нужен.
+Use this if `cloudflared` already runs on the server. Caddy is not needed.
 
-1. В `.env`:
+1. In `.env`:
    ```env
    COMPOSE_PROFILES=web
    DOMAIN=monitor.example.com
    ```
-2. Создайте файл `docker-compose.override.yml` рядом с `docker-compose.yml` и опубликуйте приложение на свободном порту только для localhost (здесь 8088):
+2. Create `docker-compose.override.yml` next to `docker-compose.yml` and publish the app on a free port, localhost only (8088 here):
    ```yaml
    services:
      webapp:
        ports:
          - "127.0.0.1:8088:8080"
    ```
-3. Запустите без Caddy:
+3. Start without Caddy:
    ```bash
    docker compose up -d --build monitor webapp
    ```
-4. В Cloudflare: Zero Trust → Networks → Tunnels → ваш туннель → **Public Hostname** → Add:
-   `monitor` + ваш домен → Service `HTTP` → `localhost:8088`.
-   DNS-запись создаётся сама; если нет, добавьте в DNS зоны CNAME `monitor` → `<id-туннеля>.cfargotunnel.com` (Proxied).
-5. Откройте `https://monitor.example.com/healthz`: должно ответить `ok`.
+4. In Cloudflare: Zero Trust → Networks → Tunnels → your tunnel → **Public Hostname** → Add:
+   `monitor` + your domain → Service `HTTP` → `localhost:8088`.
+   If the DNS record is not created automatically, add a CNAME `monitor` → `<tunnel-id>.cfargotunnel.com` (Proxied) to the zone.
+5. Open `https://monitor.example.com/healthz`: it should answer `ok`.
 
-### Привязка к боту
+### Connect it to the bot
 
-В Telegram: @BotFather → `/mybots` → ваш бот → Bot Settings → Menu Button → Configure menu button →
-укажите `https://monitor.example.com`. Либо откройте приложение кнопкой **Open in app** из алерта.
-Если кнопка меню не появилась, перезапустите Telegram.
+In Telegram: @BotFather → `/mybots` → your bot → Bot Settings → Menu Button → Configure menu button →
+enter `https://monitor.example.com`. Or open the app with the **Open in app** button from an alert.
+If the menu button does not appear, restart Telegram.
 
-### Доступ
+### Access
 
-- `ADMIN_TELEGRAM_IDS`: полный доступ (через запятую). Если пусто, админом считается `TELEGRAM_CHAT_ID`.
-- `VIEWER_TELEGRAM_IDS`: только просмотр.
-- Посторонний при входе получает отказ, а его ID пишется в лог (`docker compose logs webapp`), чтобы вы могли его добавить.
+- `ADMIN_TELEGRAM_IDS`: full access (comma-separated). If empty, `TELEGRAM_CHAT_ID` is the admin.
+- `VIEWER_TELEGRAM_IDS`: read-only.
+- Anyone else is refused and their ID is logged (`docker compose logs webapp`), so you can add it.
 
-## Использование
+## Usage
 
-| Что нужно | Как |
-|-----------|-----|
-| Посмотреть статус | Mini App, вкладка «Контейнеры» |
-| Нагрузка сервера | Вкладка «Сервер» (обновляется каждые 10 секунд) |
-| Перезапустить контейнер | Открыть контейнер → Restart (только админы) |
-| Не получать алерты по контейнеру | Контейнер → «Заглушить» (на 15 минут … 24 часа) |
-| Плановые работы | Настройки → Режим обслуживания |
-| Что падало и когда | Вкладка «История» |
+| What you need | How |
+|---------------|-----|
+| See status | Mini App, Containers tab |
+| Server load | Server tab (refreshes every 10 seconds) |
+| Restart a container | Open the container → Restart (admins only) |
+| Stop alerts for a container | Container → Mute (15 minutes … 24 hours) |
+| Planned maintenance | Settings → Maintenance mode |
+| What failed and when | History tab |
 
-Остановки и перезапуски, сделанные через приложение, алертов не вызывают. Заглушённые сбои всё равно попадают в историю.
+Stops and restarts made through the app do not trigger alerts. Muted failures are still recorded in the history.
 
-## Управление сервисом
+## Managing the service
 
 ```bash
-docker compose logs -f monitor        # логи монитора
-docker compose logs -f webapp         # логи веб-приложения
-docker compose up -d --build          # обновление после git pull
-docker compose down                   # остановить (история сохраняется в томе monitor-data)
+docker compose logs -f monitor        # monitor logs
+docker compose logs -f webapp         # web app logs
+docker compose up -d --build          # update after git pull
+docker compose down                   # stop (history is kept in the monitor-data volume)
 ```
 
-Монитор и веб-приложение помечены `docker-monitor.protected=true`: из приложения их остановить нельзя.
+The monitor and web app carry the label `docker-monitor.protected=true`, so they cannot be stopped from the app.
 
-## Переменные окружения
+## Environment variables
 
-| Переменная | Описание |
-|------------|----------|
-| `TELEGRAM_BOT_TOKEN` | Токен бота (также проверяет входы в Mini App) |
-| `TELEGRAM_CHAT_ID` | Чат, куда приходят алерты |
-| `DISCORD_WEBHOOK_URL` | Вебхук Discord (необязательно) |
-| `COMPOSE_PROFILES` | `web` включает веб-приложение и Caddy |
-| `DOMAIN` | Публичный домен приложения, без `https://` и слеша |
-| `ADMIN_TELEGRAM_IDS` | Telegram ID с полным доступом |
-| `VIEWER_TELEGRAM_IDS` | Telegram ID только для просмотра |
-| `INIT_DATA_MAX_AGE` | Сколько секунд действует вход через Telegram (по умолчанию 21600) |
-| `HISTORY_DB` | Путь к SQLite (в compose: `/data/history.db`) |
+| Variable | Description |
+|----------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Bot token (also verifies Mini App logins) |
+| `TELEGRAM_CHAT_ID` | Chat that receives alerts |
+| `DISCORD_WEBHOOK_URL` | Discord webhook (optional) |
+| `COMPOSE_PROFILES` | `web` enables the web app and Caddy |
+| `DOMAIN` | Public domain of the app, without `https://` and trailing slash |
+| `ADMIN_TELEGRAM_IDS` | Telegram IDs with full access |
+| `VIEWER_TELEGRAM_IDS` | Telegram IDs with read-only access |
+| `INIT_DATA_MAX_AGE` | Seconds a Telegram login stays valid (default 21600) |
+| `HISTORY_DB` | Path of the SQLite file (in compose: `/data/history.db`) |
 
-## Запуск без Docker (для разработки)
+## Running without Docker (development)
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python monitor.py --once             # одна проверка и выход
-python monitor.py --interval 10      # проверять каждые 10 секунд
+python monitor.py --once             # single check, then exit
+python monitor.py --interval 10      # poll every 10 seconds
 ```
 
-## Безопасность
+## Security
 
-- `.env` содержит секреты и не попадает в git (см. `.gitignore`). Не публикуйте токен бота.
-- Вход в приложение проверяется подписью Telegram (`initData`, HMAC с токеном бота) и списком ID.
-- Монитор монтирует `/var/run/docker.sock`: это доступ к Docker хоста, фактически root. Давайте доступ только доверенным людям.
-- Логи контейнеров могут содержать секреты, а приложение их показывает.
-- Переменные окружения контейнеров приложение не показывает.
+- `.env` holds secrets and is kept out of git (see `.gitignore`). Never publish your bot token.
+- App logins are verified with Telegram's signed `initData` (HMAC with the bot token) and the ID lists.
+- The monitor mounts `/var/run/docker.sock`: this is access to the host's Docker, effectively root. Only give access to people you trust.
+- Container logs can contain secrets, and the app displays them.
+- The app never shows containers' environment variables.
 
-## Частые проблемы
+## Troubleshooting
 
-| Симптом | Решение |
-|---------|---------|
-| Алерты не приходят | Нажмите Start у бота; проверьте токен и chat id; `docker compose logs monitor` |
-| `Discord notification failed: 400` | Не задан реальный `DISCORD_WEBHOOK_URL`, используется заглушка. Безвредно |
-| Приложение не открывается в Telegram | Нужен публичный HTTPS; проверьте `https://домен/healthz` |
-| «Доступ запрещён» | Добавьте свой ID в `ADMIN_TELEGRAM_IDS` и перезапустите: `docker compose up -d` |
-| Порты 80/443 заняты | Используйте способ 2 (Cloudflare Tunnel) или другой порт для webapp |
-| После перезагрузки лишний алерт `exited` | Контейнер успел проверяться, пока Docker его запускал. Если контейнер остался остановленным, алерт настоящий |
+| Symptom | Fix |
+|---------|-----|
+| No alerts arrive | Press Start in the bot; check the token and chat id; `docker compose logs monitor` |
+| `Discord notification failed: 400` | No real `DISCORD_WEBHOOK_URL` is set, a placeholder is used. Harmless |
+| App does not open in Telegram | Public HTTPS is required; check `https://domain/healthz` |
+| "Access denied" | Add your ID to `ADMIN_TELEGRAM_IDS` and run `docker compose up -d` |
+| Ports 80/443 are taken | Use Option 2 (Cloudflare Tunnel) or another port for webapp |
+| Extra `exited` alert after a reboot | The container was checked while Docker was still starting it. If it stayed stopped, the alert is real |
