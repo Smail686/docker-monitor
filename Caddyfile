@@ -1,0 +1,7 @@
+# Caddy obtains and renews the HTTPS certificate automatically (Let's Encrypt).
+# DOMAIN comes from the environment (.env). Ports 80 and 443 must be reachable
+# from the internet and the domain's A record must point to this server.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy webapp:8080
+}

@@ -1,0 +1,69 @@
+services:
+  # --- Always on: the monitor itself ------------------------------------------------
+  monitor:
+    build: .
+    image: docker-monitor:latest
+    container_name: docker-monitor
+    restart: unless-stopped
+    labels:
+      docker-monitor.protected: "true"      # the web app refuses to stop/restart it
+    environment:
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-https://discord.com/api/webhooks/test/test}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      DOMAIN: ${DOMAIN:-}                   # adds an "Open in app" button to Telegram alerts
+      HISTORY_DB: /data/history.db
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - monitor-data:/data                  # history now survives container re-creation
+
+  # --- Telegram Mini App (enabled with COMPOSE_PROFILES=web in .env) -----------------
+  webapp:
+    profiles: ["web"]
+    build: .
+    image: docker-monitor:latest
+    container_name: docker-monitor-web
+    restart: unless-stopped
+    entrypoint: ["python", "-u", "webapp.py"]
+    labels:
+      docker-monitor.protected: "true"
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      ADMIN_TELEGRAM_IDS: ${ADMIN_TELEGRAM_IDS:-}
+      VIEWER_TELEGRAM_IDS: ${VIEWER_TELEGRAM_IDS:-}
+      DOMAIN: ${DOMAIN:-}
+      HISTORY_DB: /data/history.db
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - monitor-data:/data
+    # No published ports: only the proxy below can reach the app.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    profiles: ["web"]
+    image: caddy:2
+    container_name: docker-monitor-proxy
+    restart: unless-stopped
+    labels:
+      docker-monitor.protected: "true"
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data                    # keeps certificates between restarts
+      - caddy-config:/config
+    depends_on:
+      - webapp
+
+volumes:
+  monitor-data:
+  caddy-data:
+  caddy-config:
